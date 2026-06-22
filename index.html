@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五子棋 AI 對戰</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a2a3a 0%, #2c3e50 50%, #1a2a3a 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            padding: 20px;
+        }
+
+        .game-container {
+            background: linear-gradient(145deg, #3d2e1e, #5a3f2b);
+            padding: 30px 35px 35px 35px;
+            border-radius: 48px;
+            box-shadow:
+                0 30px 60px rgba(0, 0, 0, 0.7),
+                0 0 0 2px #6b4f35 inset,
+                0 0 0 4px #2d1f12 inset;
+            max-width: 820px;
+            width: 100%;
+        }
+
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            padding: 0 8px;
+        }
+
+        .game-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #f0d9b5;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            letter-spacing: 2px;
+        }
+
+        .game-title span {
+            color: #ffd78a;
+        }
+
+        .game-status {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 22px;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #f0d9b5;
+            border: 1px solid #8b7355;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #555;
+            border: 2px solid #888;
+            transition: background 0.3s;
+            flex-shrink: 0;
+        }
+
+        .status-dot.black {
+            background: #1a1a1a;
+            border-color: #666;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.15);
+        }
+
+        .status-dot.white {
+            background: #f5f5f5;
+            border-color: #ddd;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.25);
+        }
+
+        .status-dot.win {
+            background: #ffd700;
+            border-color: #ffaa00;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+            animation: pulse-gold 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-gold {
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.25);
+                opacity: 0.8;
+            }
+        }
+
+        .status-text {
+            min-width: 60px;
+        }
+
+        .board-wrapper {
+            position: relative;
+            background: #d4a56a;
+            border-radius: 28px;
+            padding: 12px;
+            box-shadow:
+                0 0 0 2px #6b4f35,
+                0 0 0 4px #2d1f12,
+                inset 0 0 30px rgba(0, 0, 0, 0.3);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            aspect-ratio: 1/1;
+            background: #dcb885;
+            border-radius: 18px;
+            cursor: pointer;
+            touch-action: none;
+            box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .game-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 18px;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .controls-left {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .controls-right {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 22px;
+            border: none;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:active {
+            transform: scale(0.94);
+        }
+
+        .btn-primary {
+            background: linear-gradient(145deg, #f0d9b5, #d4b88c);
+            color: #2d1f12;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-danger {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(145deg, #2ecc71, #27ae60);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(145deg, #5d6d7e, #3d4d5e);
+            color: #f0d9b5;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+        }
+
+        .btn-secondary.active {
+            background: linear-gradient(145deg, #f0d9b5, #d4b88c);
+            color: #2d1f12;
+        }
+
+        .difficulty-group {
+            display: flex;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px 6px;
+            border-radius: 30px;
+            border: 1px solid #6b4f35;
+        }
+
+        .btn-diff {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: transparent;
+            color: #b8956a;
+            font-family: inherit;
+        }
+
+        .btn-diff:hover {
+            color: #f0d9b5;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .btn-diff.active {
+            background: #f0d9b5;
+            color: #2d1f12;
+            box-shadow: 0 2px 12px rgba(240, 217, 181, 0.3);
+        }
+
+        .step-counter {
+            color: #b8956a;
+            font-size: 15px;
+            font-weight: 500;
+            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 30px;
+            border: 1px solid #6b4f35;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .step-counter span {
+            color: #f0d9b5;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .winner-msg {
+            font-size: 20px;
+            font-weight: 700;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes pop-in {
+            0% {
+                transform: scale(0.5);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* 移動端適配 */
+        @media (max-width: 600px) {
+            .game-container {
+                padding: 14px 14px 18px 14px;
+                border-radius: 28px;
+            }
+            .game-title {
+                font-size: 20px;
+            }
+            .game-status {
+                font-size: 14px;
+                padding: 5px 14px;
+            }
+            .status-dot {
+                width: 12px;
+                height: 12px;
+            }
+            .btn {
+                padding: 7px 14px;
+                font-size: 13px;
+            }
+            .btn-diff {
+                padding: 5px 12px;
+                font-size: 12px;
+            }
+            .step-counter {
+                font-size: 13px;
+                padding: 5px 12px;
+            }
+            .game-controls {
+                gap: 8px;
+            }
+            .controls-left,
+            .controls-right {
+                gap: 6px;
+            }
+            .board-wrapper {
+                padding: 8px;
+                border-radius: 18px;
+            }
+            .winner-msg {
+                font-size: 16px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .game-title {
+                font-size: 16px;
+            }
+            .game-status {
+                font-size: 12px;
+                padding: 4px 10px;
+            }
+            .btn {
+                padding: 5px 10px;
+                font-size: 11px;
+            }
+            .btn-diff {
+                padding: 4px 8px;
+                font-size: 10px;
+            }
+            .step-counter {
+                font-size: 11px;
+                padding: 4px 8px;
+            }
+            .game-container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container" id="app">
+        <!-- 標題列 -->
+        <div class="game-header">
+            <div class="game-title">♟ <span>五子棋</span> AI</div>
+            <div class="game-status" id="statusDisplay">
+                <span class="status-dot black" id="statusDot"></span>
+                <span class="status-text" id="statusText">你的回合</span>
+            </div>
+        </div>
+
+        <!-- 棋盤 -->
+        <div class="board-wrapper">
+            <canvas id="boardCanvas" width="600" height="600"></canvas>
+        </div>
+
+        <!-- 控制列 -->
+        <div class="game-controls">
+            <div class="controls-left">
+                <div class="difficulty-group">
+                    <button class="btn-diff active" data-level="easy">簡單</button>
+                    <button class="btn-diff" data-level="medium">中等</button>
+                    <button class="btn-diff" data-level="hard">困難</button>
+                </div>
+                <button class="btn btn-secondary" id="undoBtn">↩ 悔棋</button>
+            </div>
+            <div class="controls-right">
+                <div class="step-counter">步數 <span id="stepCount">0</span></div>
+                <button class="btn btn-danger" id="restartBtn">⟳ 重來</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        //  五子棋 AI 對戰 — 完整實作
+        // ============================================================
+
+        // -------- 常數 --------
+        const BOARD_SIZE = 15;
+        const EMPTY = 0;
+        const BLACK = 1; // 玩家
+        const WHITE = 2; // AI
+
+        const canvas = document.getElementById('boardCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // -------- DOM 參考 --------
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const stepCountEl = document.getElementById('stepCount');
+        const undoBtn = document.getElementById('undoBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const diffBtns = document.querySelectorAll('.btn-diff');
+
+        // -------- 遊戲狀態 --------
+        let board = [];
+        let currentPlayer = BLACK; // 黑棋先手
+        let gameOver = false;
+        let winner = null; // null: 無, BLACK: 黑勝, WHITE: 白勝
+        let history = []; // [{ row, col, color }, ...]
+        let difficulty = 'easy'; // 'easy' | 'medium' | 'hard'
+        let isAIThinking = false;
+
+        // -------- 尺寸計算 --------
+        let cellSize = 0;
+        let padding = 0;
+        let canvasSize = 600;
+
+        function calcDimensions() {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const displaySize = Math.min(rect.width, rect.height);
+            canvasSize = Math.round(displaySize * dpr);
+            canvas.width = canvasSize;
+            canvas.height = canvasSize;
+            padding = canvasSize * 0.045;
+            cellSize = (canvasSize - padding * 2) / (BOARD_SIZE - 1);
+        }
+
+        // -------- 初始化棋盤 --------
+        function initBoard() {
+            board = [];
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                board.push(new Array(BOARD_SIZE).fill(EMPTY));
+            }
+            currentPlayer = BLACK;
+            gameOver = false;
+            winner = null;
+            history = [];
+            isAIThinking = false;
+            updateStatus();
+            render();
+        }
+
+        // -------- 繪製棋盤 --------
+        function render() {
+            calcDimensions();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 木紋背景
+            const grad = ctx.createRadialGradient(
+                canvas.width * 0.4, canvas.height * 0.4, 0,
+                canvas.width * 0.5, canvas.height * 0.5, canvas.width * 0.8
+            );
+            grad.addColorStop(0, '#e8c9a0');
+            grad.addColorStop(0.7, '#d4a87a');
+            grad.addColorStop(1, '#b8885a');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 網格線
+            ctx.strokeStyle = '#5a3d2b';
+            ctx.lineWidth = 1.2;
+
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                const pos = padding + i * cellSize;
+                ctx.beginPath();
+                ctx.moveTo(padding, pos);
+                ctx.lineTo(padding + (BOARD_SIZE - 1) * cellSize, pos);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(pos, padding);
+                ctx.lineTo(pos, padding + (BOARD_SIZE - 1) * cellSize);
+                ctx.stroke();
+            }
+
+            // 星位 (天元 + 四隅)
+            const starPoints = [
+                [7, 7],
+                [3, 3],
+                [3, 11],
+                [11, 3],
+                [11, 11]
+            ];
+            for (const [r, c] of starPoints) {
+                const x = padding + c * cellSize;
+                const y = padding + r * cellSize;
+                ctx.beginPath();
+                ctx.arc(x, y, cellSize * 0.12, 0, Math.PI * 2);
+                ctx.fillStyle = '#5a3d2b';
+                ctx.fill();
+            }
+
+            // 繪製棋子
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (board[r][c] === EMPTY) continue;
+                    const x = padding + c * cellSize;
+                    const y = padding + r * cellSize;
+                    const radius = cellSize * 0.42;
+
+                    const color = board[r][c] === BLACK ? '#1a1a1a' : '#f5f5f5';
+                    const shadowColor = board[r][c] === BLACK ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.2)';
+
+                    // 陰影
+                    ctx.shadowColor = shadowColor;
+                    ctx.shadowBlur = radius * 0.6;
+                    ctx.shadowOffsetX = radius * 0.1;
+                    ctx.shadowOffsetY = radius * 0.15;
+
+                    // 漸層
+                    const grd = ctx.createRadialGradient(
+                        x - radius * 0.25, y - radius * 0.3, radius * 0.05,
+                        x, y, radius
+                    );
+                    if (board[r][c] === BLACK) {
+                        grd.addColorStop(0, '#666');
+                        grd.addColorStop(0.3, '#333');
+                        grd.addColorStop(1, '#111');
+                    } else {
+                        grd.addColorStop(0, '#ffffff');
+                        grd.addColorStop(0.5, '#f0f0f0');
+                        grd.addColorStop(1, '#c8c8c8');
+                    }
+
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = grd;
+                    ctx.fill();
+
+                    // 高光 (白棋)
+                    if (board[r][c] === WHITE) {
+                        ctx.shadowColor = 'transparent';
+                        ctx.shadowBlur = 0;
+                        ctx.beginPath();
+                        ctx.arc(x - radius * 0.2, y - radius * 0.25, radius * 0.18, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                        ctx.fill();
+                    }
+
+                    // 邊框
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = board[r][c] === BLACK ? 'rgba(0,0,0,0.4)' : 'rgba(180,180,180,0.4)';
+                    ctx.lineWidth = 0.5;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // 重置陰影
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
+                }
+            }
+
+            // 最後一步標記
+            if (history.length > 0) {
+                const last = history[history.length - 1];
+                const x = padding + last.col * cellSize;
+                const y = padding + last.row * cellSize;
+                ctx.fillStyle = last.color === BLACK ? 'rgba(255,50,50,0.85)' : 'rgba(255,50,50,0.85)';
+                ctx.beginPath();
+                const size = cellSize * 0.08;
+                // 小方塊或小圓
+                const dotSize = Math.max(4, cellSize * 0.08);
+                ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 勝利線 (如果有贏家)
+            if (winner) {
+                // 找出獲勝的連線
+                const winLine = findWinLine(winner);
+                if (winLine) {
+                    ctx.save();
+                    ctx.shadowColor = 'rgba(255,215,0,0.6)';
+                    ctx.shadowBlur = 20;
+                    ctx.strokeStyle = '#ffd700';
+                    ctx.lineWidth = Math.max(3, cellSize * 0.06);
+                    ctx.lineCap = 'round';
+                    const [r1, c1, r2, c2] = winLine;
+                    const x1 = padding + c1 * cellSize;
+                    const y1 = padding + r1 * cellSize;
+                    const x2 = padding + c2 * cellSize;
+                    const y2 = padding + r2 * cellSize;
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+                    ctx.restore();
+
+                    // 在兩端加光暈
+                    for (const [x, y] of [
+                            [x1, y1],
+                            [x2, y2]
+                        ]) {
+                        ctx.save();
+                        ctx.shadowColor = 'rgba(255,215,0,0.8)';
+                        ctx.shadowBlur = 30;
+                        ctx.beginPath();
+                        ctx.arc(x, y, cellSize * 0.15, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(255,215,0,0.3)';
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                }
+            }
+
+            // 更新狀態顯示
+            updateStatus();
+        }
+
+        // -------- 尋找勝利連線 --------
+        function findWinLine(color) {
+            const directions = [
+                [0, 1],
+                [1, 0],
+                [1, 1],
+                [1, -1]
+            ];
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (board[r][c] !== color) continue;
+                    for (const [dr, dc] of directions) {
+                        let count = 1;
+                        let r1 = r,
+                            c1 = c;
+                        let r2 = r,
+                            c2 = c;
+                        // 正方向
+                        for (let step = 1; step < 5; step++) {
+                            const nr = r + dr * step,
+                                nc = c + dc * step;
+                            if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) break;
+                            if (board[nr][nc] === color) { count++;
+                                r2 = nr;
+                                c2 = nc; } else break;
+                        }
+                        // 反方向
+                        for (let step = 1; step < 5; step++) {
+                            const nr = r - dr * step,
+                                nc = c - dc * step;
+                            if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) break;
+                            if (board[nr][nc] === color) { count++;
+                                r1 = nr;
+                                c1 = nc; } else break;
+                        }
+                        if (count >= 5) {
+                            return [r1, c1, r2, c2];
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        // -------- 檢查勝利 --------
+        function checkWin(row, col, color) {
+            const directions = [
+                [0, 1],
+                [1, 0],
+                [1, 1],
+                [1, -1]
+            ];
+            for (const [dr, dc] of directions) {
+                let count = 1;
+                for (let step = 1; step < 5; step++) {
+                    const nr = row + dr * step,
+                        nc = col + dc * step;
+                    if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) break;
+                    if (board[nr][nc] === color) count++;
+                    else break;
+                }
+                for (let step = 1; step < 5; step++) {
+                    const nr = row - dr * step,
+                        nc = col - dc * step;
+                    if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) break;
+                    if (board[nr][nc] === color) count++;
+                    else break;
+                }
+                if (count >= 5) return true;
+            }
+            return false;
+        }
+
+        // -------- 檢查棋盤是否已滿 (平手) --------
+        function isBoardFull() {
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (board[r][c] === EMPTY) return false;
+                }
+            }
+            return true;
+        }
+
+        // -------- 更新狀態顯示 --------
+        function updateStatus() {
+            const dot = statusDot;
+            const text = statusText;
+
+            if (gameOver) {
+                if (winner === BLACK) {
+                    dot.className = 'status-dot win';
+                    text.textContent = '🎉 你贏了！';
+                    text.style.color = '#ffd700';
+                } else if (winner === WHITE) {
+                    dot.className = 'status-dot win';
+                    text.textContent = '😵 AI 贏了...';
+                    text.style.color = '#ff6b6b';
+                } else {
+                    dot.className = 'status-dot';
+                    text.textContent = '🤝 平手！';
+                    text.style.color = '#f0d9b5';
+                }
+                stepCountEl.textContent = history.length;
+                return;
+            }
+
+            text.style.color = '#f0d9b5';
+            if (isAIThinking) {
+                dot.className = 'status-dot white';
+                text.textContent = 'AI 思考中 ...';
+                return;
+            }
+
+            if (currentPlayer === BLACK) {
+                dot.className = 'status-dot black';
+                text.textContent = '你的回合';
+            } else {
+                dot.className = 'status-dot white';
+                text.textContent = 'AI 思考中 ...';
+            }
+            stepCountEl.textContent = history.length;
+        }
+
+        // -------- 落子 --------
+        function placeStone(row, col, color) {
+            if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) return false;
+            if (board[row][col] !== EMPTY) return false;
+            if (gameOver) return false;
+            if (color !== currentPlayer) return false;
+            if (isAIThinking) return false;
+
+            board[row][col] = color;
+            history.push({ row, col, color });
+
+            if (checkWin(row, col, color)) {
+                gameOver = true;
+                winner = color;
+                render();
+                updateStatus();
+                return true;
+            }
+
+            if (isBoardFull()) {
+                gameOver = true;
+                winner = null;
+                render();
+                updateStatus();
+                return true;
+            }
+
+            // 切換玩家
+            currentPlayer = (currentPlayer === BLACK) ? WHITE : BLACK;
+            render();
+            updateStatus();
+
+            // 如果是 AI 回合，觸發 AI
+            if (currentPlayer === WHITE && !gameOver) {
+                triggerAI();
+            }
+
+            return true;
+        }
+
+        // -------- AI 邏輯 (評分法) --------
+        // 評估在 (row, col) 下 color 棋子的得分 (四個方向總和)
+        function evaluatePoint(row, col, color) {
+            if (board[row][col] !== EMPTY) return -1;
+
+            const directions = [
+                [0, 1],
+                [1, 0],
+                [1, 1],
+                [1, -1]
+            ];
+            let totalScore = 0;
+
+            for (const [dr, dc] of directions) {
+                let count = 1;
+                let openLeft = 0,
+                    openRight = 0;
+
+                // 正方向
+                for (let step = 1; step < 5; step++) {
+                    const nr = row + dr * step,
+                        nc = col + dc * step;
+                    if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) { openRight = 0; break; }
+                    if (board[nr][nc] === color) count++;
+                    else if (board[nr][nc] === EMPTY) { openRight = 1; break; } else { openRight = 0; break; }
+                }
+
+                // 反方向
+                for (let step = 1; step < 5; step++) {
+                    const nr = row - dr * step,
+                        nc = col - dc * step;
+                    if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) { openLeft = 0; break; }
+                    if (board[nr][nc] === color) count++;
+                    else if (board[nr][nc] === EMPTY) { openLeft = 1; break; } else { openLeft = 0; break; }
+                }
+
+                const openEnds = openLeft + openRight;
+
+                // 評分表
+                let score = 0;
+                if (count >= 5) score = 1000000;
+                else if (count === 4) {
+                    if (openEnds === 2) score = 100000; // 活四
+                    else if (openEnds === 1) score = 10000; // 衝四
+                    else score = 0;
+                } else if (count === 3) {
+                    if (openEnds === 2) score = 10000; // 活三
+                    else if (openEnds === 1) score = 1000; // 眠三
+                    else score = 0;
+                } else if (count === 2) {
+                    if (openEnds === 2) score = 1000; // 活二
+                    else if (openEnds === 1) score = 100; // 眠二
+                    else score = 0;
+                } else if (count === 1) {
+                    if (openEnds === 2) score = 10; // 活一
+                    else if (openEnds === 1) score = 1; // 眠一
+                    else score = 0;
+                }
+
+                totalScore += score;
+            }
+
+            return totalScore;
+        }
+
+        // -------- AI 決策 --------
+        function getAIMove() {
+            let bestScore = -1;
+            let bestMoves = [];
+
+            // 如果棋盤為空，下中心
+            if (history.length === 0) {
+                return { row: 7, col: 7 };
+            }
+
+            // 遍歷所有空位
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (board[r][c] !== EMPTY) continue;
+
+                    // 進攻得分 (AI 下白棋)
+                    const attackScore = evaluatePoint(r, c, WHITE);
+                    // 防守得分 (假設玩家下黑棋)
+                    const defenseScore = evaluatePoint(r, c, BLACK);
+
+                    let weightAttack = 1.0;
+                    let weightDefense = 0.0;
+
+                    if (difficulty === 'easy') {
+                        weightDefense = 0.3;
+                    } else if (difficulty === 'medium') {
+                        weightDefense = 0.7;
+                    } else { // hard
+                        weightDefense = 1.1;
+                    }
+
+                    let total = attackScore * weightAttack + defenseScore * weightDefense;
+
+                    // 困難模式：稍微加強對活三、衝四的防守
+                    if (difficulty === 'hard') {
+                        // 如果防守得分中有活三或衝四，額外加權
+                        if (defenseScore >= 10000) total += defenseScore * 0.3;
+                    }
+
+                    // 簡單模式：加入隨機擾動
+                    if (difficulty === 'easy') {
+                        total += Math.random() * 2000;
+                    }
+
+                    // 中等模式：小幅隨機
+                    if (difficulty === 'medium') {
+                        total += Math.random() * 300;
+                    }
+
+                    if (total > bestScore) {
+                        bestScore = total;
+                        bestMoves = [{ row: r, col: c }];
+                    } else if (Math.abs(total - bestScore) < 0.001) {
+                        bestMoves.push({ row: r, col: c });
+                    }
+                }
+            }
+
+            if (bestMoves.length === 0) return null;
+
+            // 簡單模式：隨機選一個較好的
+            if (difficulty === 'easy' && Math.random() < 0.25) {
+                // 隨機選擇前 5 個中的一個
+                const top = bestMoves.slice(0, Math.min(5, bestMoves.length));
+                return top[Math.floor(Math.random() * top.length)];
+            }
+
+            // 否則從最佳中隨機選一個 (避免每次都一樣)
+            return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+        }
+
+        // -------- 觸發 AI 下棋 --------
+        function triggerAI() {
+            if (isAIThinking) return;
+            if (gameOver) return;
+            if (currentPlayer !== WHITE) return;
+
+            isAIThinking = true;
+            updateStatus();
+
+            // 使用 setTimeout 讓 UI 更新，避免阻塞
+            setTimeout(() => {
+                const move = getAIMove();
+                isAIThinking = false;
+
+                if (!move) {
+                    // 沒有可下的位置 (理論上不應發生)
+                    if (isBoardFull()) {
+                        gameOver = true;
+                        winner = null;
+                        render();
+                        updateStatus();
+                    }
+                    return;
+                }
+
+                const { row, col } = move;
+                // 再次檢查該位置是否仍為空 (防止並發)
+                if (board[row][col] !== EMPTY) {
+                    // 重新觸發 AI
+                    if (!gameOver && currentPlayer === WHITE) {
+                        triggerAI();
+                    }
+                    return;
+                }
+
+                // 下棋
+                placeStone(row, col, WHITE);
+                // placeStone 會處理後續狀態更新和再次觸發 AI
+            }, 50);
+        }
+
+        // -------- 悔棋 --------
+        function undoMove() {
+            if (isAIThinking) return;
+            if (gameOver) {
+                // 如果遊戲已結束，先重置遊戲狀態再悔棋
+                // 但更簡單：不允許悔棋
+                return;
+            }
+            // 需要撤銷兩步：AI 一步 + 玩家一步
+            if (history.length < 2) {
+                // 提示
+                showToast('沒有足夠的步數可以悔棋');
+                return;
+            }
+
+            // 檢查最後一步是否是 AI (白棋)
+            const last = history[history.length - 1];
+            if (last.color !== WHITE) {
+                // 如果最後一步是玩家下的，可能 AI 還沒下，這種情況不允許悔棋
+                showToast('請等待 AI 下完再悔棋');
+                return;
+            }
+
+            // 撤銷兩步
+            for (let i = 0; i < 2; i++) {
+                const step = history.pop();
+                board[step.row][step.col] = EMPTY;
+            }
+
+            // 重置遊戲狀態
+            gameOver = false;
+            winner = null;
+            currentPlayer = BLACK;
+            render();
+            updateStatus();
+            showToast('已悔棋兩步');
+        }
+
+        // -------- 簡單 Toast 提示 --------
+        function showToast(msg) {
+            const old = document.querySelector('.toast-msg');
+            if (old) old.remove();
+
+            const el = document.createElement('div');
+            el.className = 'toast-msg';
+            el.textContent = msg;
+            Object.assign(el.style, {
+                position: 'fixed',
+                bottom: '30px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'rgba(0,0,0,0.8)',
+                color: '#f0d9b5',
+                padding: '14px 32px',
+                borderRadius: '30px',
+                fontFamily: "'Segoe UI','Microsoft JhengHei',sans-serif",
+                fontSize: '18px',
+                fontWeight: '600',
+                boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+                zIndex: '999',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid #6b4f35',
+                animation: 'pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                transition: 'opacity 0.4s'
+            });
+            document.body.appendChild(el);
+
+            setTimeout(() => {
+                el.style.opacity = '0';
+                setTimeout(() => el.remove(), 400);
+            }, 1800);
+        }
+
+        // -------- 重新開始 --------
+        function restartGame() {
+            if (isAIThinking) return;
+            initBoard();
+            showToast('遊戲重新開始');
+        }
+
+        // -------- 切換難度 --------
+        function setDifficulty(level) {
+            difficulty = level;
+            diffBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.level === level);
+            });
+            if (!gameOver && currentPlayer === WHITE && !isAIThinking) {
+                // 如果當前是 AI 回合，重新觸發
+                triggerAI();
+            }
+            showToast(`難度切換為: ${level === 'easy' ? '簡單' : level === 'medium' ? '中等' : '困難'}`);
+        }
+
+        // -------- 滑鼠/觸控事件 --------
+        function getBoardPos(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (clientX - rect.left) * scaleX;
+            const y = (clientY - rect.top) * scaleY;
+
+            // 計算最近的格子
+            let minDist = cellSize * 0.5;
+            let bestRow = -1,
+                bestCol = -1;
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const px = padding + c * cellSize;
+                    const py = padding + r * cellSize;
+                    const dist = Math.hypot(x - px, y - py);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        bestRow = r;
+                        bestCol = c;
+                    }
+                }
+            }
+            return { row: bestRow, col: bestCol };
+        }
+
+        function handleCanvasClick(e) {
+            e.preventDefault();
+            if (isAIThinking) return;
+            if (gameOver) return;
+            if (currentPlayer !== BLACK) return;
+
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+                e.preventDefault();
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const pos = getBoardPos(clientX, clientY);
+            if (pos.row === -1 || pos.col === -1) return;
+            if (board[pos.row][pos.col] !== EMPTY) return;
+
+            placeStone(pos.row, pos.col, BLACK);
+        }
+
+        // -------- 視窗調整 --------
+        function handleResize() {
+            render();
+        }
+
+        // -------- 初始化事件 --------
+        function initEvents() {
+            canvas.addEventListener('click', handleCanvasClick);
+            canvas.addEventListener('touchstart', handleCanvasClick, { passive: false });
+
+            undoBtn.addEventListener('click', undoMove);
+            restartBtn.addEventListener('click', restartGame);
+
+            diffBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    setDifficulty(btn.dataset.level);
+                });
+            });
+
+            window.addEventListener('resize', handleResize);
+            // 也用 ResizeObserver 監聽 canvas 尺寸變化
+            if (window.ResizeObserver) {
+                const ro = new ResizeObserver(() => render());
+                ro.observe(canvas);
+            }
+        }
+
+        // -------- 啟動遊戲 --------
+        function init() {
+            calcDimensions();
+            initBoard();
+            initEvents();
+            render();
+
+            // 開局如果 AI 先手 (不會發生，玩家先手)
+            // 但為了安全，檢查一下
+            if (currentPlayer === WHITE) {
+                triggerAI();
+            }
+        }
+
+        // 頁面載入完成後啟動
+        window.addEventListener('DOMContentLoaded', init);
+
+        // 額外：在觸控設備上防止雙擊縮放
+        document.addEventListener('dblclick', (e) => e.preventDefault());
+    </script>
+</body>
+</html>
